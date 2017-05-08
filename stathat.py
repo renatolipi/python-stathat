@@ -61,27 +61,29 @@ class _StatHatBase(object):
 
         return self.count(async=async)
 
-    def count(self, count=1, async=True):
+    def count(self, count=1, async=True, vb=False):
         """Request to track a counter. Returns True on success or raises a :class:`StatHatError`.
 
         :param count: Optional argument, Number you want to count, default=1.
         :param async: Optional argument to override the async behavior if gevent is available.
         """
 
-        return self._send(self.COUNT_PATH, {'count': count}, async=async)
+        return self._send(self.COUNT_PATH, {'count': count}, async=async, vb=vb)
 
-    def value(self, value, async=True):
+    def value(self, value, async=True, vb=False):
         """Request to track a specific value. Returns True on success or raises a :class:`StatHatError`.
 
         :param value: Value you want to track.
         :param async: Optional argument to override the async behavior if gevent is available.
         """
-        return self._send(self.VALUE_PATH, {'value': value}, async=async)
+        return self._send(self.VALUE_PATH, {'value': value}, async=async, vb=vb)
 
-    def _send(self, path, data, async):
+    def _send(self, path, data, async, vb):
         endpoint = STATHAT_ENDPOINT + path
         payload = self._auth.copy()
         payload.update(data)
+        if vb:
+            payload.update({'vb': 1})
 
         if HAS_GEVENT and async != False:
             # Async request should be completely silent and ignore any
@@ -96,7 +98,10 @@ class _StatHatBase(object):
                 # Network issue or something else affecting the general request
                 raise StatHatError(e)
             try:
-                resp = json.loads(raw)
+                if not raw or json.loads(raw).get('status') == 204:
+                    return True
+                else:
+                    resp = json.loads(raw)
             except Exception:
                 # JSON decoding failed meaning StatHat returned something bad
                 raise StatHatError('Something bad happened: %s' % raw)
